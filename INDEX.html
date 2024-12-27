@@ -1,232 +1,90 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Ponto</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            padding: 0;
-            background-color: #f4f4f9;
-            color: #333;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ccc;
-        }
-        th, td {
-            padding: 10px;
-            text-align: center;
-        }
-        th {
-            background-color: #007BFF;
-            color: white;
-        }
-        .export-btn, .mark-holiday, .mark-day-off {
-            margin: 10px 5px;
-            padding: 10px 20px;
-            background-color: #17a2b8;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        .export-btn:hover, .mark-holiday:hover, .mark-day-off:hover {
-            background-color: #138496;
-        }
-        .totals-row {
-            font-weight: bold;
-            background-color: #f4f4f9;
-        }
-        .holiday-row {
-            background-color: #ffd6d6;
-        }
-        .day-off-row {
-            background-color: #ffe6e6;
-        }
-    </style>
-</head>
-<body>
-    <h1>Registro de Ponto</h1>
-    <button class="mark-day-off" onclick="markDayOff()">Marcar Folga</button>
-    <button class="export-btn" onclick="exportToCSV()">Exportar para CSV</button>
-    <table id="timeSheet">
-        <thead>
-            <tr>
-                <th>Data</th>
-                <th>Feriado?</th>
-                <th>Entrada</th>
-                <th>Início do Almoço</th>
-                <th>Fim do Almoço</th>
-                <th>Saída</th>
-                <th>Horas Trabalhadas</th>
-                <th>Horas Extras</th>
-            </tr>
-        </thead>
-        <tbody id="timeSheetBody">
-            <!-- Linhas serão adicionadas aqui -->
-        </tbody>
-        <tfoot>
-            <tr class="totals-row">
-                <td colspan="6">Totais:</td>
-                <td id="totalWorked">00:00:00</td>
-                <td id="totalOvertime">00:00:00</td>
-            </tr>
-            <tr class="totals-row">
-                <td colspan="6">Salário Mensal (R$):</td>
-                <td colspan="2">
-                    <input type="number" id="monthlySalary" placeholder="Digite o salário" onchange="calculateEarnings()" style="width: 100%; padding: 5px;">
-                </td>
-            </tr>
-            <tr class="totals-row">
-                <td colspan="6">Total a Receber (R$):</td>
-                <td colspan="2" id="totalEarnings">R$ 0,00</td>
-            </tr>
-        </tfoot>
-    </table>
-    <script>
-        window.onload = function () {
-            loadTable();
-        };
+<script>
+    function calculateHours(input) {
+        const row = input.parentElement.parentElement;
+        const [start, lunchStart, lunchEnd, end] = row.querySelectorAll('input[type="time"]');
+        const workedHoursCell = row.querySelector('.hours-worked');
+        const extraHoursCell = row.querySelector('.extra-hours');
+        const isHoliday = row.querySelector('input[type="checkbox"]').checked;
 
-        function loadTable() {
-            const tableBody = document.getElementById('timeSheetBody');
-            const currentDate = new Date();
-            const currentMonth = currentDate.getMonth();
-            const year = currentDate.getFullYear();
+        if (start.value && lunchStart.value && lunchEnd.value && end.value) {
+            const startTime = new Date(`1970-01-01T${start.value}:00`);
+            const lunchStartTime = new Date(`1970-01-01T${lunchStart.value}:00`);
+            const lunchEndTime = new Date(`1970-01-01T${lunchEnd.value}:00`);
+            const endTime = new Date(`1970-01-01T${end.value}:00`);
 
-            const daysInMonth = 31;
-            for (let day = 1; day <= daysInMonth; day++) {
-                const row = document.createElement('tr');
-                const formattedDate = `${year}-${padZero(currentMonth + 1)}-${padZero(day)}`;
-                row.innerHTML = `
-                    <td><input type="date" value="${formattedDate}" readonly></td>
-                    <td><input type="checkbox" onchange="toggleHoliday(this)"></td>
-                    <td><input type="time" onchange="calculateHours(this)"></td>
-                    <td><input type="time" onchange="calculateHours(this)"></td>
-                    <td><input type="time" onchange="calculateHours(this)"></td>
-                    <td><input type="time" onchange="calculateHours(this)"></td>
-                    <td class="hours-worked">00:00:00</td>
-                    <td class="extra-hours">00:00:00</td>
-                `;
-                tableBody.appendChild(row);
-            }
-        }
+            const workBeforeLunch = (lunchStartTime - startTime) / 60000;
+            const workAfterLunch = (endTime - lunchEndTime) / 60000;
+            const totalMinutes = workBeforeLunch + workAfterLunch;
+            const regularMinutes = 8 * 60;
 
-        function toggleHoliday(checkbox) {
-            const row = checkbox.parentElement.parentElement;
-            row.classList.toggle('holiday-row', checkbox.checked);
-            calculateHours(row.querySelector('input[type="time"]'));
-        }
+            const workedHours = formatTime(totalMinutes);
+            workedHoursCell.textContent = workedHours;
 
-        function markDayOff() {
-            const selectedRow = prompt("Digite o número da linha para marcar como folga (1 a 31):");
-            const tableBody = document.getElementById('timeSheetBody');
-            const rows = Array.from(tableBody.getElementsByTagName('tr'));
-
-            if (selectedRow > 0 && selectedRow <= rows.length) {
-                const row = rows[selectedRow - 1];
-                row.classList.add('day-off-row');
-                row.querySelectorAll('input[type="time"]').forEach(input => {
-                    input.value = '';
-                    input.disabled = true;
-                });
-                row.querySelector('.hours-worked').textContent = 'Folga';
-                row.querySelector('.extra-hours').textContent = 'Folga';
-                updateTotals();
+            if (totalMinutes > regularMinutes || isHoliday) {
+                const overtimeRate = isHoliday ? 2 : 1.5; // Feriado = 100% (dobro)
+                const overtimeMinutes = isHoliday ? totalMinutes : totalMinutes - regularMinutes;
+                const overtime = formatTime(overtimeMinutes > 0 ? overtimeMinutes : 0);
+                extraHoursCell.textContent = overtime;
             } else {
-                alert("Número de linha inválido. Por favor, insira um valor entre 1 e 31.");
-            }
-        }
-
-        function calculateHours(input) {
-            const row = input.parentElement.parentElement;
-            const [start, lunchStart, lunchEnd, end] = row.querySelectorAll('input[type="time"]');
-            const workedHoursCell = row.querySelector('.hours-worked');
-            const extraHoursCell = row.querySelector('.extra-hours');
-            const isHoliday = row.querySelector('input[type="checkbox"]').checked;
-
-            if (start.value && lunchStart.value && lunchEnd.value && end.value) {
-                const startTime = new Date(`1970-01-01T${start.value}:00`);
-                const lunchStartTime = new Date(`1970-01-01T${lunchStart.value}:00`);
-                const lunchEndTime = new Date(`1970-01-01T${lunchEnd.value}:00`);
-                const endTime = new Date(`1970-01-01T${end.value}:00`);
-
-                const workBeforeLunch = (lunchStartTime - startTime) / 60000;
-                const workAfterLunch = (endTime - lunchEndTime) / 60000;
-                const totalMinutes = workBeforeLunch + workAfterLunch;
-                const regularMinutes = 8 * 60;
-
-                const workedHours = formatTime(totalMinutes);
-                workedHoursCell.textContent = workedHours;
-
-                if (totalMinutes > regularMinutes || isHoliday) {
-                    const overtimeRate = isHoliday ? 2 : 1.5;
-                    const overtimeMinutes = totalMinutes - regularMinutes;
-                    const overtime = formatTime(overtimeMinutes > 0 ? overtimeMinutes : 0);
-                    extraHoursCell.textContent = overtime;
-                } else {
-                    extraHoursCell.textContent = '00:00:00';
-                }
-                updateTotals();
-            } else {
-                workedHoursCell.textContent = '00:00:00';
                 extraHoursCell.textContent = '00:00:00';
-                updateTotals();
             }
+            updateTotals();
+        } else {
+            workedHoursCell.textContent = '00:00:00';
+            extraHoursCell.textContent = '00:00:00';
+            updateTotals();
         }
+    }
 
-        function updateTotals() {
-            let totalWorkedMinutes = 0;
-            let totalOvertimeMinutes = 0;
+    function updateTotals() {
+        let totalWorkedMinutes = 0;
+        let totalOvertimeMinutes = 0;
 
-            document.querySelectorAll('.hours-worked').forEach(cell => {
-                if (cell.textContent !== 'Folga') {
-                    totalWorkedMinutes += parseTime(cell.textContent);
-                }
-            });
+        document.querySelectorAll('.hours-worked').forEach(cell => {
+            if (cell.textContent !== 'Folga') {
+                totalWorkedMinutes += parseTime(cell.textContent);
+            }
+        });
 
-            document.querySelectorAll('.extra-hours').forEach(cell => {
-                if (cell.textContent !== 'Folga') {
-                    totalOvertimeMinutes += parseTime(cell.textContent);
-                }
-            });
+        document.querySelectorAll('.extra-hours').forEach((cell, index) => {
+            const row = document.getElementById('timeSheetBody').rows[index];
+            const isHoliday = row.querySelector('input[type="checkbox"]').checked;
+            const overtimeMinutes = parseTime(cell.textContent);
 
-            document.getElementById('totalWorked').textContent = formatTime(totalWorkedMinutes);
-            document.getElementById('totalOvertime').textContent = formatTime(totalOvertimeMinutes);
-            calculateEarnings();
-        }
+            if (isHoliday) {
+                totalOvertimeMinutes += overtimeMinutes * 2; // Dobro em feriado
+            } else {
+                totalOvertimeMinutes += overtimeMinutes;
+            }
+        });
 
-        function calculateEarnings() {
-            const monthlySalary = parseFloat(document.getElementById('monthlySalary').value) || 0;
-            const totalOvertimeMinutes = parseTime(document.getElementById('totalOvertime').textContent);
-            const hourlyRate = monthlySalary / (22 * 8);
-            const overtimePay = (totalOvertimeMinutes / 60) * hourlyRate * 1.5;
-            const totalEarnings = monthlySalary + overtimePay;
+        document.getElementById('totalWorked').textContent = formatTime(totalWorkedMinutes);
+        document.getElementById('totalOvertime').textContent = formatTime(totalOvertimeMinutes);
+        calculateEarnings();
+    }
 
-            document.getElementById('totalEarnings').textContent = `R$ ${totalEarnings.toFixed(2)}`;
-        }
+    function calculateEarnings() {
+        const monthlySalary = parseFloat(document.getElementById('monthlySalary').value) || 0;
+        const totalOvertimeMinutes = parseTime(document.getElementById('totalOvertime').textContent);
+        const hourlyRate = monthlySalary / (22 * 8); // 22 dias úteis * 8 horas por dia
+        const overtimePay = (totalOvertimeMinutes / 60) * hourlyRate; // Pagamento de horas extras
+        const totalEarnings = monthlySalary + overtimePay;
 
-        function parseTime(time) {
-            const [hours, minutes] = time.split(':').map(Number);
-            return hours * 60 + minutes;
-        }
+        document.getElementById('totalEarnings').textContent = `R$ ${totalEarnings.toFixed(2)}`;
+    }
 
-        function formatTime(minutes) {
-            const hours = Math.floor(minutes / 60);
-            const mins = Math.floor(minutes % 60);
-            return `${padZero(hours)}:${padZero(mins)}:00`;
-        }
+    function parseTime(time) {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    }
 
-        function padZero(value) {
-            return value < 10 ? '0' + value : value;
-        }
-    </script>
-</body>
-</html>
+    function formatTime(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const mins = Math.floor(minutes % 60);
+        return `${padZero(hours)}:${padZero(mins)}:00`;
+    }
+
+    function padZero(value) {
+        return value < 10 ? '0' + value : value;
+    }
+</script>
