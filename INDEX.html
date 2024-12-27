@@ -28,8 +28,8 @@
             background-color: #007BFF;
             color: white;
         }
-        .export-btn {
-            margin: 10px 0;
+        .export-btn, .mark-holiday, .mark-day-off {
+            margin: 10px 5px;
             padding: 10px 20px;
             background-color: #17a2b8;
             color: white;
@@ -37,7 +37,7 @@
             cursor: pointer;
             border-radius: 5px;
         }
-        .export-btn:hover {
+        .export-btn:hover, .mark-holiday:hover, .mark-day-off:hover {
             background-color: #138496;
         }
         .totals-row {
@@ -47,10 +47,15 @@
         .holiday-row {
             background-color: #ffd6d6;
         }
+        .day-off-row {
+            background-color: #ffe6e6;
+        }
     </style>
 </head>
 <body>
     <h1>Registro de Ponto</h1>
+    <button class="mark-day-off" onclick="markDayOff()">Marcar Folga</button>
+    <button class="export-btn" onclick="exportToCSV()">Exportar para CSV</button>
     <table id="timeSheet">
         <thead>
             <tr>
@@ -85,7 +90,6 @@
             </tr>
         </tfoot>
     </table>
-    <button class="export-btn" onclick="exportToCSV()">Exportar para CSV</button>
     <script>
         window.onload = function () {
             loadTable();
@@ -121,6 +125,26 @@
             calculateHours(row.querySelector('input[type="time"]'));
         }
 
+        function markDayOff() {
+            const selectedRow = prompt("Digite o número da linha para marcar como folga (1 a 31):");
+            const tableBody = document.getElementById('timeSheetBody');
+            const rows = Array.from(tableBody.getElementsByTagName('tr'));
+
+            if (selectedRow > 0 && selectedRow <= rows.length) {
+                const row = rows[selectedRow - 1];
+                row.classList.add('day-off-row');
+                row.querySelectorAll('input[type="time"]').forEach(input => {
+                    input.value = '';
+                    input.disabled = true;
+                });
+                row.querySelector('.hours-worked').textContent = 'Folga';
+                row.querySelector('.extra-hours').textContent = 'Folga';
+                updateTotals();
+            } else {
+                alert("Número de linha inválido. Por favor, insira um valor entre 1 e 31.");
+            }
+        }
+
         function calculateHours(input) {
             const row = input.parentElement.parentElement;
             const [start, lunchStart, lunchEnd, end] = row.querySelectorAll('input[type="time"]');
@@ -143,7 +167,7 @@
                 workedHoursCell.textContent = workedHours;
 
                 if (totalMinutes > regularMinutes || isHoliday) {
-                    const overtimeRate = isHoliday ? 2 : 1.5; // 100% extra para feriado
+                    const overtimeRate = isHoliday ? 2 : 1.5;
                     const overtimeMinutes = totalMinutes - regularMinutes;
                     const overtime = formatTime(overtimeMinutes > 0 ? overtimeMinutes : 0);
                     extraHoursCell.textContent = overtime;
@@ -163,11 +187,15 @@
             let totalOvertimeMinutes = 0;
 
             document.querySelectorAll('.hours-worked').forEach(cell => {
-                totalWorkedMinutes += parseTime(cell.textContent);
+                if (cell.textContent !== 'Folga') {
+                    totalWorkedMinutes += parseTime(cell.textContent);
+                }
             });
 
             document.querySelectorAll('.extra-hours').forEach(cell => {
-                totalOvertimeMinutes += parseTime(cell.textContent);
+                if (cell.textContent !== 'Folga') {
+                    totalOvertimeMinutes += parseTime(cell.textContent);
+                }
             });
 
             document.getElementById('totalWorked').textContent = formatTime(totalWorkedMinutes);
@@ -179,7 +207,7 @@
             const monthlySalary = parseFloat(document.getElementById('monthlySalary').value) || 0;
             const totalOvertimeMinutes = parseTime(document.getElementById('totalOvertime').textContent);
             const hourlyRate = monthlySalary / (22 * 8);
-            const overtimePay = (totalOvertimeMinutes / 60) * hourlyRate * 1.5; // Normal
+            const overtimePay = (totalOvertimeMinutes / 60) * hourlyRate * 1.5;
             const totalEarnings = monthlySalary + overtimePay;
 
             document.getElementById('totalEarnings').textContent = `R$ ${totalEarnings.toFixed(2)}`;
